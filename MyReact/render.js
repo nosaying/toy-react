@@ -2,6 +2,8 @@ let nextUnitOfWork = null
 let wipRoot = null
 let currentRoot = null
 let deletions = []
+let wipFiber = []
+let hooksIndex = 0
 
 function reconcileChildren(wipFiber, elements) {
     let prevSibling = null;
@@ -51,7 +53,38 @@ function reconcileChildren(wipFiber, elements) {
     }
 }
 
+function useState(initial) {
+    const oldHooks = wipFiber.alternate.hooks?.[hooksIndex]
+    const hook = {
+        state: oldHooks ? oldHooks.state : initial,
+        queue: []
+    }
+
+    const actions = oldHooks ? oldHooks.queue : []
+    actions.forEach(action => {
+        hook.state = action
+    })
+
+    const setState = action => {
+        hook.queue.push(action)
+        wipRoot= {
+            dom: currentRoot.dom,
+            props: currentRoot.props,
+            alternate: currentRoot
+        }
+
+        nextUnitOfWork = wipRoot
+        deletions = []
+    }
+    wipFiber.hooks.push(hook)
+    hooksIndex++
+    return [hook.state, setState]
+}
+
 function updateFunctionComponent(fiber) {
+    wipFiber = fiber
+    wipFiber.hoos = []
+    hooksIndex = 0;
     const children = [fiber.type(fiber.props)]
     reconcileChildren(fiber, children)
 }
@@ -144,9 +177,9 @@ function commitWork(fiber) {
     if(!fiber) return
 
     // const domParent = fiber.parent.dom
-    const domParentFiber = fiber.parent
+    let domParentFiber = fiber.parent
     while(!domParentFiber.dom) {
-        domParentFiber.parent
+        domParentFiber = domParentFiber.parent
     }
     const domParent = domParentFiber.dom
 
@@ -213,4 +246,7 @@ function render(element, container) {
     deletions = []
 }
 
-export default render
+export {
+    render,
+    useState
+}
